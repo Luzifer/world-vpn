@@ -1,0 +1,18 @@
+client
+dev tun
+proto udp
+remote {{ droplet.droplet.ip_address }} 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+ca ca.crt
+tls-client
+remote-cert-tls server
+auth-user-pass
+comp-lzo
+verb 1
+reneg-sec 0
+
+redirect-gateway def1
+dhcp-option DNS 8.8.8.8

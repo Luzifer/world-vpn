@@ -1,0 +1,79 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - vars/secret.yml
+
+  vars:
+    ubuntu_image_id: 13089493 # Ubuntu 14.04 x64
+    region: 8 # nyc3
+    size: 66 # 512mb
+
+  tasks:
+    - name: Create droplet
+      digital_ocean:
+        state: present
+        command: droplet
+        name: world-vpn
+        api_key: "{{ digital_ocean_api_key }}"
+        client_id: "{{ digital_ocean_client_id }}"
+        size_id: "{{ size }}"
+        region_id: "{{ region }}"
+        image_id: "{{ ubuntu_image_id }}"
+        unique_name: yes
+        ssh_key_ids:
+          - "{{ ssh_key_id }}"
+      register: droplet
+
+    - add_host:
+        hostname: world-vpn
+        ansible_ssh_host: "{{ droplet.droplet.ip_address }}"
+
+    - file:
+        dest: ~/Library/Application Support/Tunnelblick/Configurations/World-VPN.tblk/Contents/Resources/
+        state: directory
+        recurse: yes
+
+    - template:
+        dest: ~/Library/Application Support/Tunnelblick/Configurations/World-VPN.tblk/Contents/Resources/config.ovpn
+        src: templates/config.ovpn.j2
+
+- hosts: world-vpn
+  gather_facts: True
+  user: root
+
+  vars_files:
+    - vars/secret.yml
+
+  roles:
+    - Stouts.openvpn
+
+  vars:
+    openvpn_use_pam: yes
+    openvpn_use_pam_users:
+      - name: vpn
+        password: "{{ openvpn_password }}"
+
+  tasks:
+    - sysctl: name="net.ipv4.ip_forward" value=1 sysctl_set=yes state=present reload=yes
+
+    - name: Change ufw forward policy to ACCEPT
+      lineinfile:
+        dest: /etc/default/ufw
+        line: DEFAULT_FORWARD_POLICY="DROP"
+        regexp: DEFAULT_FORWARD_POLICY="[A-Z]+"
+
+    - copy:
+        dest: /etc/ufw/before.rules
+        src: files/before.rules
+
+    - ufw: state=enabled policy=allow
+
+    - fetch:
+        dest: /tmp/ca.crt
+        src: /etc/openvpn/keys/ca.crt
+        flat: yes
+
+    - local_action: command mv /tmp/ca.crt "~/Library/Application Support/Tunnelblick/Configurations/World-VPN.tblk/Contents/Resources/ca.crt"

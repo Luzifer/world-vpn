@@ -1,0 +1,22 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - vars/secret.yml
+
+  tasks:
+    - name: Delete droplet
+      digital_ocean:
+        state: absent
+        command: droplet
+        name: world-vpn
+        api_key: "{{ digital_ocean_api_key }}"
+        client_id: "{{ digital_ocean_client_id }}"
+        unique_name: yes
+
+    - name: Remove Tunnelblick connection
+      file:
+        state: absent
+        dest: ~/Library/Application Support/Tunnelblick/Configurations/World-VPN.tblk
